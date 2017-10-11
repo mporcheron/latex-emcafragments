@@ -1,0 +1,162 @@
+
+%%%%
+%%%% EMCA-ESQUE TRANSCRIPT FORMATTING FOR LaTeX
+%%%%
+%%%% (c) Martin Porcheron 2017.
+%%%% MIT LICENCE
+%%%%
+
+% Configuration
+\def\MPFragFontSize{\scriptsize}
+\def\MPFragBaselineStetch{0.1}
+\def\MPFragBaselineCache{\baselineskip}
+
+% Setup
+\RequirePackage{etoolbox,xparse,xstring,soulutf8,gensymb}
+\RequirePackage{,tabu,longtable,colortbl,environ,multicol,multirow}
+\RequirePackage{newfloat,caption,tocloft}
+
+\newcounter{MPFragCount}
+\newbool{MPFragIsFirstLine}
+\newbool{MPFragIsWithPhotos}
+\newbool{MPFragShouldAddFigArrow}
+\newcommand{\MPFragLineCounter}{ERROR}
+
+% Setup the Inner Fragment and list of fragments
+\newlistof{fragment}{lofrags}{List of Fragments}
+\DeclareFloatingEnvironment[
+    fileext=lofrags,
+    listname={List of Fragments},
+    name=Fragment,
+    placement=tbhp,
+    within=chapter,
+]{fragment}
+
+\renewcommand{\cftfragmentleader}{\hspace{1.5em}}%
+\renewcommand{\cftfragmentafterpnum}{\cftparfillskip}%
+\renewcommand{\cftfragmentpresnum}{\fragmentname~}%Fig.~}
+\newlength{\fragmentlabelwidth}
+\settowidth{\fragmentlabelwidth}{\cftfragmentpresnum~999}
+\addtolength{\fragmentlabelwidth}{2.5em}
+\cftsetindents{fragment}{0em}{\fragmentlabelwidth}
+\newcommand{\listfragmentsname}{List of Fragments}
+
+% Fragment minipage
+%
+% Example:
+% 	\begin{fragment}[<<first line number>>]
+% 		\begin{frag}
+% 		...
+% 		\end{frag}
+% 		\captionof{figure}{Caption Text}\label{frag:label}
+% 	\end{fragment}
+\NewEnviron{fragpage}{
+	\vspace{0.3cm}%
+	\captionsetup{type=fragment}%
+	\BODY%
+	\vspace{0.3cm}%
+}
+
+% Figure-less fragment
+%
+% Example:
+% 	\begin{frag}[<<first line number>>]
+% 	...
+% 	\end{frag}\captionof{figure}{Caption Text}\label{frag:label}
+\NewEnviron{frag}[1][1]{%
+	\boolfalse{MPFragIsWithPhotos}%
+	\boolfalse{MPFragShouldAddFigArrow}%
+	\refstepcounter{MPFragCount}%
+	\renewcommand{\MPFragLineCounter}{MPFrag\arabic{MPFragCount}LineCount}%
+	\newcounter{\MPFragLineCounter}%
+	\setcounter{\MPFragLineCounter}{#1}%
+	\renewcommand{\arraystretch}{\MPFragBaselineStetch}%
+	\begin{longtabu}[t]{llX[5,l,p]}%
+		\BODY%
+	\end{longtabu}%
+}
+
+% Fragment with figures.
+%
+% Example:
+% 	\begin{frag*}[<<first line number>>]
+% 	...
+% 	\end{frag*}\captionof{figure}{Caption Text}\label{frag:label}
+\NewEnviron{frag*}[1][1]{%
+	\booltrue{MPFragIsWithPhotos}%
+	\boolfalse{MPFragShouldAddFigArrow}%
+	\refstepcounter{MPFragCount}%
+	\renewcommand{\MPFragLineCounter}{MPFrag\arabic{MPFragCount}LineCount}%
+	\newcounter{\MPFragLineCounter}%
+	\setcounter{\MPFragLineCounter}{#1}%
+	\renewcommand{\arraystretch}{\MPFragBaselineStetch}%
+	\begin{longtabu}[t]{lllX[5,l,p]}%
+		\BODY%
+	\end{longtabu}%
+}
+
+% PRint a line of text (will reflow but succeeding lines won't add line numbers).
+%
+% Example:
+% 	\by Name {Text}
+%
+% Adds additional trailing whitespace:
+% 	\by* Name {Text}
+\DeclareDocumentCommand\by{>{\TrimSpaces} s l +m}{
+	\ifbool{MPFragShouldAddFigArrow}{\boolfalse{MPFragShouldAddFigArrow}\hspace*{-20.5px}$\leftarrow$}{\MPFragPrintLineNum & \ifbool{MPFragIsWithPhotos}{&}{}}%
+	\IfValueT{#2}{\IfStrEq{#2}{}{}{\texttt{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize #2}}} &%
+	\texttt{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize #3}
+	\IfValueT{#1}{\vspace{.3cm}}%
+}
+
+% Add an image (line number option broken)
+% 	\img <<number of lines>> {image_path}
+\DeclareDocumentCommand\im{>{\TrimSpaces} l m}{
+	\hspace{0mm}\MPFragPrintLineNum & %
+	\multirow{#1}{*}{\parbox[t]{0.4\textwidth}{\vspace*{-5.25mm}\includegraphics[width=0.4\columnwidth]{#2}}} &%
+	\booltrue{MPFragShouldAddFigArrow} %
+}
+
+% Leave information out of the transcript, or add a gap in time
+%
+% Example for a gap of 1.2 seconds:
+% 	\later{1.2}
+%
+% Cut four lines out of the transcript:
+% 	\later{\ldots}{4}
+\DeclareDocumentCommand\later{>{\TrimSpaces} m o}{
+	\hspace{0mm}\IfValueF{#2}{\MPFragPrintLineNum} &%
+	\ifbool{MPFragIsWithPhotos}{&}{} &%
+	\hspace*{-5mm}\texttt{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize (#1)\vspace{3mm}}%
+	\IfValueT{#2}{\addtocounter{\MPFragLineCounter}{#2}}%
+}
+
+% Format text in the fragment quote format for in-text quotations
+\DeclareDocumentCommand\QF{s o +m}{``{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize\texttt{#3}}''\IfValueT{#2}{ (\IfBooleanTF{#1}{lines}{line} #2)}}
+\DeclareDocumentCommand\QFp{s o +m}{``{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize\texttt{#3}}''\IfValueT{#2}{, \IfBooleanTF{#1}{lines}{line} #2}}
+\DeclareDocumentCommand\QFt{s o +m}{``{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize\texttt{#3}}''\IfValueT{#2}{, \IfBooleanTF{#1}{lines}{line} #2}}
+\DeclareDocumentCommand\fragquote{+m}{``{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize\texttt{#1}}''}
+
+% **********************************************************************************************************************
+
+
+% Formatting of text
+\DeclareDocumentCommand\intUp{}{$\uparrow$}
+\DeclareDocumentCommand\intDown{}{$\downarrow$}
+\DeclareDocumentCommand\redacted{}{\textit{redacted}}
+\DeclareDocumentCommand\quiet{+m}{\degree#1\degree}
+\DeclareDocumentCommand\emph{+m}{\underline{#1}}
+\DeclareDocumentCommand\loud{+m}{\MakeUppercase{#1}}
+\DeclareDocumentCommand\quick{+m}{<#1>}
+
+
+% **********************************************************************************************************************
+
+% Print the line number of the fragment and increment the counter
+\DeclareDocumentCommand\MPFragPrintLineNum{}{%
+	\texttt{\renewcommand\baselinestretch{\MPFragBaselineStetch}\MPFragFontSize\selectfont%
+	\ifnum\value{\MPFragLineCounter}<10 0\fi\arabic{\MPFragLineCounter}}%
+	\refstepcounter{\MPFragLineCounter}%
+}
+
+
